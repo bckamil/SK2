@@ -440,9 +440,6 @@ void * client_handler(void  *t_data)
 		if(!strncmp(buffor,"ready", 5) && room){
 			this_data->room_list[this_data->room_index].ready_player(this_data->player_index);
 			cout << "ready\n";
-			string temp = "1\n";
-			sending_message(this_data->connection_socket_descriptor,temp,temp.length());
-
 		}
 		if(!strncmp(buffor,"leave", 5) && room){
 			pthread_mutex_lock(&(this_data->room_list_mutex)); 
