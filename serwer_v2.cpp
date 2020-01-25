@@ -15,7 +15,7 @@ using namespace std;
 
 #define MAX_PLAYERS 10
 #define MAX_ROOMS 10
-#define PORT 8080
+#define PORT 8082
 #define BUFOR_SIZE 50
 #define HP 5
 #define HASLA_W_PULI 3
@@ -57,7 +57,7 @@ class user{
 		return this->score;
 	}
 	void set_score(int score){
-		this->socket_id=score;
+		this->score=score;
 	}
 	void add_score(int good){
 		this->score+=good;
@@ -112,6 +112,9 @@ class room
 	void end(){
 		int max=0;
 		for(int i=0;i<MAX_PLAYERS;i++){
+			cout<<user_list[i].get_socket_id()<< "ID przed end game\n";
+		}
+		for(int i=0;i<MAX_PLAYERS;i++){
 			if(this->user_list[i].get_socket_id()>0 && this->user_list[i].get_ready()){
 				if(max<user_list[i].get_score()){
 					max = user_list[i].get_score();
@@ -122,11 +125,13 @@ class room
 			if(this->user_list[i].get_socket_id()>0){
 				if(max==user_list[i].get_score()){
 					string temp = "Wygrales\n";
-					sending_message(user_list[i].get_socket_id(),temp,temp.length());
+					int id = this->user_list[i].get_socket_id();
+					sending_message(id,temp,temp.length());
 				}
 				else{
 					string temp = "Unlucky\n";
-					sending_message(user_list[i].get_socket_id(),temp,temp.length());
+					int id = this->user_list[i].get_socket_id();
+					sending_message(id,temp,temp.length());
 				}
 			}
 		}
@@ -134,7 +139,11 @@ class room
 			if(this->user_list[i].get_socket_id()>0){
 				user_list[i].set_ready(false);
 				user_list[i].set_score(0);
+				user_list[i].set_hp(HP);
 			}
+		}
+		for(int i=0;i<MAX_PLAYERS;i++){
+			cout<<user_list[i].get_socket_id()<< "ID po end game\n";
 		}
 		this->game_alive=false;
 		cout<<"koniec\n";
@@ -216,7 +225,6 @@ class room
 			revealed_password=password;
 			cout<<counter<<"trafionych\n";
 			this->user_list[id].add_score(10*counter);
-			this->game_alive = false;
 			send_game();
 			end();
 		}
@@ -251,9 +259,9 @@ class room
 			if(this->user_list[i].get_socket_id()>0){
 				string temp;
 				temp.append(revealed_password);
-				temp.append("-");
+				temp.append(";");
 				temp.append(to_string(this->user_list[i].get_hp()));
-				temp.append("-");
+				temp.append(";");
 				temp.append(to_string(this->user_list[i].get_score()));
 				temp.append("\n");
 				cout<< temp << " - wiadomosc\n";
@@ -272,6 +280,7 @@ class room
 		for(int i=0;i<MAX_PLAYERS;i++){
 			if(this->user_list[i].get_socket_id()>0){
 				players +=1;
+				cout<<user_list[i].get_socket_id()<<"id gracza\n";
 			}
 		}
 		for(int j=0;j<MAX_PLAYERS;j++){
@@ -431,6 +440,9 @@ void * client_handler(void  *t_data)
 		if(!strncmp(buffor,"ready", 5) && room){
 			this_data->room_list[this_data->room_index].ready_player(this_data->player_index);
 			cout << "ready\n";
+			string temp = "1\n";
+			sending_message(this_data->connection_socket_descriptor,temp,temp.length());
+
 		}
 		if(!strncmp(buffor,"leave", 5) && room){
 			pthread_mutex_lock(&(this_data->room_list_mutex)); 
@@ -440,6 +452,8 @@ void * client_handler(void  *t_data)
 			cout << "usunieto\n";
 			pthread_mutex_unlock(&(this_data->room_list_mutex)); 
 			room=false;
+			string temp = "1\n";
+			sending_message(this_data->connection_socket_descriptor,temp,temp.length());
 		}
 		if(!strncmp(buffor,"guess", 5) && room && this_data->room_list[this_data->room_index].get_game_alive() && this_data->room_list[this_data->room_index].get_user_alive(this_data->player_index)){
 			string temp = "";
@@ -516,3 +530,4 @@ int main(int argc, char ** argv) {
     delete server_status;
 	return(0);
 }
+
