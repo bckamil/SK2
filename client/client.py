@@ -2,8 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QLineEdit
 
 import sys
-
-from ui_Main import Ui_Main
+import threading
 
 import socket
 
@@ -11,7 +10,7 @@ import socket
 class Communication():
     def __init__(self):
         self.host = '127.0.0.1'
-        self.port = 8080
+        self.port = 8082
         self.sock = self.connect(self.host, self.port)
 
     def connect(self, host, port):
@@ -44,6 +43,7 @@ class Communication():
 class GameCommunication(Communication):
     def __init__(self):
         super(GameCommunication, self).__init__()
+        self.game_status = None
 
     def create_room(self):
         return self.send_data(b'create\r\n')
@@ -55,7 +55,12 @@ class GameCommunication(Communication):
         return self.send_data(command)
 
     def ready(self):
-        return self.send_data(b'ready\r\n')
+        self.sock.send(b'ready\r\n')
+        #t2 = threading.Thread(target=self.listen)
+        #t2.start()
+
+    def listen(self):
+        self.game_status = self.sock.recv(1024).decode('utf-8')
 
     def send_letter(self, letter):
         command = 'send ' + letter + '\r\n'
@@ -71,7 +76,6 @@ class Main(QMainWindow, GameCommunication):
     def __init__(self, parent=None):
         super(Main, self).__init__(parent)
         self.game_id = 0
-        self.game_status = None
         self.setupUi()
 
     def setupUi(self):
@@ -162,7 +166,13 @@ class Main(QMainWindow, GameCommunication):
 
     def make_letter(self, letter):
         def send_l():
-            self.send_letter(letter)
+            command = 'send ' + letter + '\r\n'
+            command = bytes(command, encoding='utf-8')
+
+            self.send_data(command)
+            self.game_status = self.sock.recv(1024).decode('utf-8')
+            print(self.game_status)
+            # self.game_status = self.send_letter(letter).decode('utf-8')
         return send_l
 
 if __name__ == '__main__':
