@@ -15,7 +15,7 @@ using namespace std;
 
 #define MAX_PLAYERS 10
 #define MAX_ROOMS 10
-#define PORT 8082
+#define PORT 8085
 #define BUFOR_SIZE 50
 #define HP 5
 #define HASLA_W_PULI 3
@@ -342,7 +342,7 @@ struct thread_data{
 	pthread_mutex_t room_list_mutex;  
 	pthread_mutex_t connection_descriptor_mutex; 
 }; 
-char *readData(int fd){
+char *readData(int fd,thread_data *t_data, bool *connected){
 
 	char * buffor = new char[BUFOR_SIZE];
     char * temp = new char[2];
@@ -351,9 +351,16 @@ char *readData(int fd){
     memset(temp,'\0',2);
     do{
         fail=read(fd,temp,1);
-        if(fail==-1){
-			error(1,errno, "read failed on descriptor %d", fd);
-		} 
+        if(fail<0)
+        {
+            cout<< "Błąd przy próbie odczytu wiadomosci\n";
+			
+            pthread_exit(NULL);
+        }
+		if(fail==0){
+			*connected=false;
+			break;
+		}
         strcat(buffor,temp);
     }while(strcmp(temp,"\n"));
     delete temp;
@@ -398,7 +405,7 @@ void * client_handler(void  *t_data)
 	char * buffor;
 	thread_data *this_data = (thread_data*)t_data;
 	while(connected && *(this_data->server_status)){
-        buffor = readData(this_data->connection_socket_descriptor);
+        buffor = readData(this_data->connection_socket_descriptor,this_data, &connected);
 		if(!buffor){
 			break;
 		}
@@ -467,6 +474,12 @@ void * client_handler(void  *t_data)
 
 		delete buffor;
 	}
+	cout << "Umarlem\n";
+	close(this_data->connection_socket_descriptor);
+	if(this_data->room_index>-1){
+		this_data->room_list[this_data->room_index].remove_user(this_data->player_index);
+	}
+	delete this_data;
 	return (void *)0;
 }
 int main(int argc, char ** argv) {
