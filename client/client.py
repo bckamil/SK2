@@ -10,7 +10,7 @@ import socket
 class Communication():
     def __init__(self):
         self.host = '127.0.0.1'
-        self.port = 8082
+        self.port = 8085
         self.sock = self.connect(self.host, self.port)
 
     def connect(self, host, port):
@@ -36,17 +36,17 @@ class Communication():
             msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
 
             retval = msg.exec_()
-        
-        return self.sock.recv(1024)
 
 
 class GameCommunication(Communication):
     def __init__(self):
         super(GameCommunication, self).__init__()
         self.game_status = None
+        t2 = threading.Thread(target=self.listen)
+        t2.start()
 
     def create_room(self):
-        return self.send_data(b'create\r\n')
+        self.send_data(b'create\r\n')
 
     def join(self, id):
         command = 'join ' + str(id) + '\r\n'
@@ -56,17 +56,21 @@ class GameCommunication(Communication):
 
     def ready(self):
         self.sock.send(b'ready\r\n')
-        #t2 = threading.Thread(target=self.listen)
-        #t2.start()
 
     def listen(self):
-        self.game_status = self.sock.recv(1024).decode('utf-8')
+        while True:
+            self.game_status = self.sock.recv(1024).decode('utf-8')
+            self.game_label.setText('')
+            if self.game_status == 'Unlucky\n' or self.game_status == 'Wygrales\n' or self.game_status == 'Nie zyjesz\n':
+                self.game_win_label.setText(self.game_status)
+            else:
+                self.game_label.setText(self.game_status)
 
     def send_letter(self, letter):
         command = 'send ' + letter + '\r\n'
         command = bytes(command, encoding='utf-8')
 
-        return self.send_data(command)
+        self.send_data(command)
 
     def leave(self):
         self.send_data(b'leave\r\n')
@@ -75,7 +79,6 @@ class GameCommunication(Communication):
 class Main(QMainWindow, GameCommunication):    
     def __init__(self, parent=None):
         super(Main, self).__init__(parent)
-        self.game_id = 0
         self.setupUi()
 
     def setupUi(self):
@@ -114,12 +117,11 @@ class Main(QMainWindow, GameCommunication):
     def click_join(self):
         id = self.textbox.text()
         if id != '':
-            self.game_id = self.join(id).decode("utf-8")
-
+            self.join(id)
             self.QtStack.setCurrentIndex(1)
 
     def click_create(self):
-        self.game_id = self.create_room().decode("utf-8")
+        self.create_room()
         self.QtStack.setCurrentIndex(1)
 
     def game(self):
@@ -144,10 +146,11 @@ class Main(QMainWindow, GameCommunication):
             button.setGeometry(QtCore.QRect(i*40 + i * 20 + 40, 280, 40, 40))
             button.clicked.connect(self.make_letter(letter))
 
-        self.id_label = QtWidgets.QLabel('Id: ' + str(self.game_id), self.stack2)
-        self.id_label.setGeometry(QtCore.QRect(40, 40, 40, 40))
-
         self.game_label = QtWidgets.QLabel(str(self.game_status), self.stack2)
+        self.game_label.setGeometry(QtCore.QRect(60, 60, 300, 40))
+
+        self.game_win_label = QtWidgets.QLabel(str(''), self.stack2)
+        self.game_win_label.setGeometry(QtCore.QRect(60, 105, 300, 40))
 
         self.ready_button = QtWidgets.QPushButton('Ready', self.stack2)
         self.ready_button.setGeometry(QtCore.QRect(40, 340, 60, 40))
@@ -159,23 +162,24 @@ class Main(QMainWindow, GameCommunication):
 
     def set_ready(self):
         self.ready()
+        self.game_win_label.setText('')
 
     def set_leave(self):
         self.leave()
+        self.game_win_label.setText('')
         self.QtStack.setCurrentIndex(0)
 
     def make_letter(self, letter):
         def send_l():
-            command = 'send ' + letter + '\r\n'
-            command = bytes(command, encoding='utf-8')
-
-            self.send_data(command)
-            self.game_status = self.sock.recv(1024).decode('utf-8')
-            print(self.game_status)
-            # self.game_status = self.send_letter(letter).decode('utf-8')
+            self.send_letter(letter)
         return send_l
 
-if __name__ == '__main__':
+
+def main():
     app = QApplication(sys.argv)
     showMain = Main()
     sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    main()
