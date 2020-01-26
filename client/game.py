@@ -4,11 +4,13 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLineEdit
 import threading
 import socket
 
+import config
+
 
 class Communication():
     def __init__(self):
-        self.host = '127.0.0.1'
-        self.port = 8085
+        self.host = config.HOST
+        self.port = config.PORT
         self.sock = self.connect(self.host, self.port)
 
     def connect(self, host, port):
