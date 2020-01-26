@@ -2,7 +2,8 @@
 
 Projekt na przedmiot Sieci Komputerowe 2
 
-# Start serwera: TODO
+# Start serwera:
+`./compile_and_run.sh` lub użycie cmake
 
 # Start klienta
 ```
