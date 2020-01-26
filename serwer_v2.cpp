@@ -77,7 +77,6 @@ class user{
 			return true;
 		}
 		else{
-			cout << "Nie zyjesz\n";
 			return false;
 		}
 	}
@@ -110,10 +109,7 @@ class room
 		pthread_mutex_init(&password_mutex,NULL);
 	}
 	void end(){
-		int max=0;
-		for(int i=0;i<MAX_PLAYERS;i++){
-			cout<<user_list[i].get_socket_id()<< "ID przed end game\n";
-		}
+		int max=-1000;
 		for(int i=0;i<MAX_PLAYERS;i++){
 			if(this->user_list[i].get_socket_id()>0 && this->user_list[i].get_ready()){
 				if(max<user_list[i].get_score()){
@@ -142,18 +138,15 @@ class room
 				user_list[i].set_hp(HP);
 			}
 		}
-		for(int i=0;i<MAX_PLAYERS;i++){
-			cout<<user_list[i].get_socket_id()<< "ID po end game\n";
-		}
 		this->game_alive=false;
-		cout<<"koniec\n";
 	}
 	void start(){
 		srand (time(NULL));
 		int secret = rand() % HASLA_W_PULI;
+		while(hasla[secret]==password){
+			secret = rand() % HASLA_W_PULI;
+		}
 		this->password=hasla[secret];
-		cout<<password<< " -- haslo\n";
-		cout<<password.length()<< " -- ma tyle znakow";
 		this->password_len=password.length();
 		this->revealed_password = this->password;
 		for(int i = 0; i< password_len ; i++){
@@ -162,20 +155,27 @@ class room
 			}
 		}
 		send_game();
-		cout<<revealed_password<< " -- odkryte haslo\n";
+	}
+	void check_hp(){
+		for(int i=0;i<MAX_PLAYERS;i++){
+			if(this->user_list[i].get_hp()>0){
+				break;
+			}
+			if(i==MAX_PLAYERS-1){
+				end();
+			}
+		}
 	}
 	int check_letter(char letter, int id){
 		pthread_mutex_lock(&(this->password_mutex)); 
 		int count = 0;
-		cout<<id<<" identyfikator\n";
-		cout<<user_list[id].get_socket_id()<<" socket\n";
 		for(int i=0; i< this->password_len;i++){
 			if(revealed_password[i]==letter){
 				this->user_list[id].remove_hp(1);
 				this->user_list[id].add_score(-5);
-				cout<<user_list[id].get_score()<<"minus score\n";
 				send_game();
-				pthread_mutex_unlock(&(this->password_mutex)); 
+				pthread_mutex_unlock(&(this->password_mutex));
+				check_hp();
 				return count;
 			}
 		}
@@ -187,12 +187,11 @@ class room
 		}
 		if(count>0){
 			this->user_list[id].add_score(10*count);
-			cout<<user_list[id].get_score()<<"dodane \n";
 		}
 		else{
 			this->user_list[id].remove_hp(1);
-				this->user_list[id].add_score(-5);
-				cout<<user_list[id].get_score()<<"pudlo \n";
+			this->user_list[id].add_score(-5);
+
 		}
 		
 		bool compere = true;
@@ -209,13 +208,13 @@ class room
 			end();
 		}
 		send_game();
-		pthread_mutex_unlock(&(this->password_mutex)); 
+		pthread_mutex_unlock(&(this->password_mutex));
+		check_hp(); 
 		return count;
 	}
 	int check_password(string guess, int id){
 		pthread_mutex_lock(&(this->password_mutex)); 
 		if(guess == password){
-			cout<<"trafiony\n";
 			int counter=0;
 			for(int i=0; i< this->password_len;i++){
 				if(revealed_password[i]=='_'){
@@ -223,7 +222,6 @@ class room
 				}
 			}
 			revealed_password=password;
-			cout<<counter<<"trafionych\n";
 			this->user_list[id].add_score(10*counter);
 			send_game();
 			end();
@@ -231,9 +229,10 @@ class room
 		else{
 			this->user_list[id].add_score(-5);
 			this->user_list[id].remove_hp(1);
-			cout<<"pudlo\n";
+			send_game();
 		}
 		pthread_mutex_unlock(&(this->password_mutex));
+		check_hp();
 		return 1;
 	}
 	string get_password(){
@@ -264,7 +263,6 @@ class room
 				temp.append(";");
 				temp.append(to_string(this->user_list[i].get_score()));
 				temp.append("\n");
-				cout<< temp << " - wiadomosc\n";
 				sending_message(user_list[i].get_socket_id(),temp,temp.length());
 			}
 		}
@@ -273,14 +271,12 @@ class room
 		return this->game_alive;
 	}
 	void ready_player(int id){
-		cout<<id<<"id\n";
 		this->user_list[id].set_ready(true);
 		int counter = 0;
 		int players = 0;
 		for(int i=0;i<MAX_PLAYERS;i++){
 			if(this->user_list[i].get_socket_id()>0){
 				players +=1;
-				cout<<user_list[i].get_socket_id()<<"id gracza\n";
 			}
 		}
 		for(int j=0;j<MAX_PLAYERS;j++){
@@ -288,8 +284,6 @@ class room
 				counter +=1;
 			}
 		}
-		cout<<players<<"graczy\n";
-		cout<<counter<<" counter gotowych graczy\n";
 		if(counter>1&&counter==players){
 			this->game_alive=true;
 			start();
@@ -303,7 +297,6 @@ class room
 		for(int i =0; i<MAX_PLAYERS;i++){
 			if(this->user_list[i].get_socket_id()==-1){
 				this->user_list[i] = user;
-				cout<<i<<"id \n";
 				add = i;
 				return add;
 			}
@@ -322,15 +315,19 @@ class room
 		if(counter<2&&this->game_alive){
 			end();
 		}
-		cout<<counter<<" zostalo w pokoju \n";
 		if(counter==0){
 			this->room_alive=false;
-			cout<<"zamknieto pokoj\n";
+			cout <<"zamknieto pokoj\n";
 		}
 	}
 	bool get_user_alive(int id){
 		return this->user_list[id].get_alive();
 	}
+	~room()
+    {
+        pthread_mutex_destroy(&(this->password_mutex));
+        delete [] this->user_list;
+    };
 };
 struct thread_data{
 	int connection_socket_descriptor; 
@@ -353,7 +350,7 @@ char *readData(int fd,thread_data *t_data, bool *connected){
         fail=read(fd,temp,1);
         if(fail<0)
         {
-            cout<< "Błąd przy próbie odczytu wiadomosci\n";
+            cout << "Błąd przy próbie odczytu wiadomosci\n";
 			
             pthread_exit(NULL);
         }
@@ -374,10 +371,8 @@ bool conecting_to_room(thread_data *t_data,int id){
 		result = t_data->room_list[id].add_user(temp_user);
 		if(result>0){
 			join = true;
-			cout << result<<"connect\n";
 			t_data->room_index=id;
 			t_data->player_index=result;
-			cout << t_data->player_index<<" connect po zapisaniu\n";
 		}
 	}
 	return join;
@@ -421,7 +416,6 @@ void * client_handler(void  *t_data)
 				temp = to_string(id);
 				temp.append("\n");
 				this_data->room_index=id;
-				std::cout<<this_data->player_index<<"\n";
 			}
 			sending_message(this_data->connection_socket_descriptor,temp,temp.length());
 			pthread_mutex_unlock(&(this_data->room_list_mutex)); 
@@ -434,7 +428,6 @@ void * client_handler(void  *t_data)
 			if(result){
 				temp=to_string(this_data->room_index);
 				temp.append("\n");
-				write(1, buffor, BUFOR_SIZE);
 				room = true;
 			}
 			sending_message(this_data->connection_socket_descriptor,temp,temp.length());
@@ -446,14 +439,12 @@ void * client_handler(void  *t_data)
 		}
 		if(!strncmp(buffor,"ready", 5) && room){
 			this_data->room_list[this_data->room_index].ready_player(this_data->player_index);
-			cout << "ready\n";
 		}
 		if(!strncmp(buffor,"leave", 5) && room){
 			pthread_mutex_lock(&(this_data->room_list_mutex)); 
 			this_data->room_list[this_data->room_index].remove_user(this_data->player_index);
 			this_data->player_index=-1;
 			this_data->room_index=-1;
-			cout << "usunieto\n";
 			pthread_mutex_unlock(&(this_data->room_list_mutex)); 
 			room=false;
 			string temp = "1\n";
@@ -468,7 +459,6 @@ void * client_handler(void  *t_data)
 				}
 			}
 			temp.append(buffor,6,counter);
-			//cout<<temp<<" koniec\n";
 			this_data->room_list[this_data->room_index].check_password(temp, this_data->player_index);
 		}
 
