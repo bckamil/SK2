@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLineEdit
 
 import threading
 import socket
-
+import sys
 import config
 
 
